@@ -57,7 +57,9 @@ def histogram(data):
 
 
 # Load data
-data = pd.read_csv("CICFlowMeter_Testing_Balanced.csv")
+# data = pd.read_csv("datasets/CICFlowMeter_Testing_Balanced.csv")
+data = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
+print(data.columns)
 
 # Features want to drop
 drop_features = [
@@ -66,7 +68,6 @@ drop_features = [
     "Src Port",
 ]
 data = data.drop(columns=drop_features, errors="ignore")
-# print(data)
 
 # Encode labels to numerical value to make processing easier
 le = LabelEncoder()
@@ -76,6 +77,7 @@ numerical_data = data.select_dtypes(include=[np.number])
 
 attack_labels = data["Label"].unique()
 attack_labels = [x for x in attack_labels if x != "NORMAL"]
+
 
 top_features_corr = {
     label: get_top_features_corr(label, data, top_n=20)[0] for label in attack_labels
@@ -88,17 +90,17 @@ top_features_mi = {
 }
 my_print(top_features_mi)
 
-top_features_rf = {
-    label: get_top_features_rf(label, data, top_n=20)[0] for label in attack_labels
-}
-my_print(top_features_rf)
+# top_features_rf = {
+#     label: get_top_features_rf(label, data, top_n=20)[0] for label in attack_labels
+# }
+# my_print(top_features_rf)
 
 
-rfe_results_by_attack = {
-    label: get_top_features_rfe(label, data, n_features_to_select=10)
-    for label in attack_labels
-}
-print(rfe_results_by_attack)
+# rfe_results_by_attack = {
+#     label: get_top_features_rfe(label, data, n_features_to_select=10)
+#     for label in attack_labels
+# }
+# print(rfe_results_by_attack)
 
 # Creates and saves a correlation heatmap between labels and features
 # label_feature_correlation_heatmap(data)
@@ -113,11 +115,11 @@ for label in attack_labels:
         result.append({"Label": label, "Feature": feature, "Correlation": corr})
 
 results_df = pd.DataFrame(result)
-results_df.to_csv("./data/top_correlated_features.csv")
+results_df.to_csv("./exported_data/top_correlated_features.csv")
 
 
 # Creates a histogram
-# histo = histogram(top_features_corr)
+histo = histogram(top_features_corr)
 
 # print("\n\nFrequency of features:")
 # for key, value in histo.items():

@@ -21,23 +21,23 @@ def get_top_features_corr(attack_label, data, top_n=10):
     # Calculate Pearson correlation
     correlation_matrix = combined.corr()
 
-    # plt.figure(figsize=(30, 26))
-    # sns.heatmap(
-    #     correlation_matrix,
-    #     annot=False,
-    #     cmap="coolwarm",
-    #     cbar=True,
-    #     linewidths=0.3,
-    #     linecolor="gray",
-    #     xticklabels=True,
-    #     yticklabels=True,
-    # )
-    # plt.title("Feature to Feature interaction")
-    # plt.xticks(rotation=45, ha="right", fontsize=12)
-    # plt.yticks(fontsize=12)
-    # plt.tight_layout()
-    # # plt.show()
-    # plt.savefig("./figures/feature-to-feature.png", format="png", dpi=300)
+    plt.figure(figsize=(30, 26))
+    sns.heatmap(
+        correlation_matrix,
+        annot=False,
+        cmap="coolwarm",
+        cbar=True,
+        linewidths=0.3,
+        linecolor="gray",
+        xticklabels=True,
+        yticklabels=True,
+    )
+    plt.title("Feature to Feature interaction")
+    plt.xticks(rotation=45, ha="right", fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig("./figures/feature-to-feature.png", format="png", dpi=300)
 
     # Get correlations with the target and sort by abs value
     target_correlation = (
