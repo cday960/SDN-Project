@@ -53,6 +53,31 @@ def preprocess_data(df, target_column, drop_columns=None):
     return x_scaled, y, label_encodings
 
 
+def preprocess_data_sklearn(
+    df, target_column, drop_columns=None, test_size=0.2, random_state=42
+):
+    """
+    Takes one dataset and splits it into test and train sets
+    """
+    df.columns = df.columns.str.strip()
+
+    if drop_columns:
+        df = df.drop(columns=drop_columns)
+
+    mlb = MultiLabelBinarizer()
+    y = mlb.fit_transform(df[target_column].str.split(","))
+
+    x = df.select_dtypes(include=["int64", "float64"])
+
+    scaler = StandardScaler()
+    x_scaled = scaler.fit_transform(x)
+
+    return (
+        train_test_split(x_scaled, y, test_size=test_size, random_state=random_state),
+        mlb,
+    )
+
+
 def random_split_features(x, num_splits=3):
     """
     Randomly split up features into (by default) 3 groups

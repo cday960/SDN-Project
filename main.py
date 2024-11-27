@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
+import joblib
 from tensorflow.keras import models
 from tensorflow.keras.layers import (
     Dense,
@@ -16,6 +17,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_selection import mutual_info_classif, RFE
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
+from sklearn.multiclass import OneVsRestClassifier
 from feature_selection import (
     get_top_features_rfe,
     get_top_features_corr,
@@ -23,6 +25,7 @@ from feature_selection import (
     get_top_features_mi,
     label_feature_correlation_heatmap,
     preprocess_data,
+    preprocess_data_sklearn,
     random_split_features,
 )
 
@@ -111,7 +114,7 @@ def histogram(data):
     return histo
 
 
-def main():
+def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
     train_df = pd.read_csv("datasets/Custom_DNP3_Parser_Training_Balanced.csv")
     test_df = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
 
@@ -136,11 +139,11 @@ def main():
     model = random_factoring_tree(x_train, splits, num_classes)
 
     # custom optimizer
-    # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-    # model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=["accuracy"])
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=["accuracy"])
 
     # stock optimizer
-    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+    # model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
 
     x_train_branches = [x_train[:, split] for split in splits]
     x_test_branches = [x_test[:, split] for split in splits]
@@ -148,7 +151,7 @@ def main():
     model.fit(
         x_train_branches,
         y_train,
-        epochs=500,
+        epochs=epochs,
         batch_size=32,
         validation_data=(x_test_branches, y_test),
     )
@@ -165,7 +168,43 @@ def main():
         print(f"{i}: {label}")
     # print(label_encodings)
 
-    model.save("./models/new_model.h5")
+    if save_model:
+        model.save("./models/new_model.h5")
+
+
+def random_forest_pipeline(n_estimators, save_model=False):
+    dataset = pd.read_csv("datasets/CICFlowMeter_Testing_Balanced.csv")
+
+    drop_columns = [
+        "Unnamed: 0.1",
+        "Unnamed: 0",
+        # "source port",
+        # "source IP",
+        # "destination IP",
+    ]
+    target_column = "Label"
+
+    (x_train, x_test, y_train, y_test), mlb = preprocess_data_sklearn(
+        dataset, target_column, drop_columns
+    )
+
+    rf_model = OneVsRestClassifier(
+        RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+    )
+    rf_model.fit(x_train, y_train)
+
+    y_pred = rf_model.predict(x_test)
+
+    print("Random forst classification report:")
+    print(classification_report(y_test, y_pred, target_names=mlb.classes_))
+
+    if save_model:
+        joblib.dump(rf_model, "./models/new_sklearn_model.pkl")
+
+
+def main():
+    # train_random_factoring_tree_model(epochs=500, learning_rate=0.001, save_model=False)
+    random_forest_pipeline(n_estimators=100, save_model=True)
 
 
 if __name__ == "__main__":
