@@ -2,9 +2,67 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler, MultiLabelBinarizer
 from sklearn.feature_selection import mutual_info_classif, RFE
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+
+def preprocess_data(df, target_column, drop_columns=None):
+    """
+    Drops unnecessary columns.
+    Encodes the target column.
+    Scales features.
+    """
+
+    df.columns = df.columns.str.strip()
+
+    if drop_columns:
+        df = df.drop(columns=drop_columns)
+
+    # print(df.columns)
+
+    # Encode target var for classification
+    # le = LabelEncoder()
+    # df[target_column] = le.fit_transform(df[target_column])
+
+    mlb = MultiLabelBinarizer()
+    y = mlb.fit_transform(df[target_column].str.split(","))
+
+    label_encodings = []
+    for _, label in enumerate(mlb.classes_):
+        label_encodings.append(label)
+
+    # Creates a list of all columns that are numerical so we can
+    # encode all of the features
+    numerical_features = df.select_dtypes(include=["int64", "float64"]).columns
+    # numerical_features = numerical_features.drop(target_column)
+
+    # Separate features and target
+    x = df[numerical_features]
+    # y = df[target_column]
+
+    # Scale features
+    """
+    This standard scaler standardizes the features to have a mean of 0 and a std of 1.
+    Helps deal with flow duration dominating the model.
+    """
+    scaler = StandardScaler()
+    x_scaled = scaler.fit_transform(x)
+
+    return x_scaled, y, label_encodings
+
+
+def random_split_features(x, num_splits=3):
+    """
+    Randomly split up features into (by default) 3 groups
+    for tree branches.
+    """
+    n_features = x.shape[1]
+    feature_indices = np.arange(n_features)
+    np.random.shuffle(feature_indices)
+    splits = np.array_split(feature_indices, num_splits)
+    return splits
 
 
 def get_top_features_corr(attack_label, data, top_n=10):
