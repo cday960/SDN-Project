@@ -13,7 +13,7 @@ from tensorflow.keras.layers import (
     BatchNormalization,
     Dropout,
 )
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer, StandardScaler
 from sklearn.feature_selection import mutual_info_classif, RFE
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
@@ -114,6 +114,11 @@ def histogram(data):
     return histo
 
 
+def load_tf_model(path):
+    loaded_model = models.load_model(path)
+    return loaded_model
+
+
 def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
     train_df = pd.read_csv("datasets/Custom_DNP3_Parser_Training_Balanced.csv")
     test_df = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
@@ -121,16 +126,13 @@ def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
     drop_columns = [
         "Unnamed: 0.1",
         "Unnamed: 0",
-        "source port",
-        "source IP",
-        "destination IP",
     ]
     target_column = "Label"
 
-    x_train, y_train, label_encodings = preprocess_data(
-        train_df, target_column, drop_columns
+    x_train, y_train, mlb = preprocess_data(
+        train_df, target_column, drop_columns, save_file=save_model
     )
-    x_test, y_test, _ = preprocess_data(test_df, target_column, drop_columns)
+    x_test, y_test, mlb = preprocess_data(test_df, target_column, drop_columns)
 
     splits = random_split_features(x_train, num_splits=3)
 
@@ -162,14 +164,15 @@ def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
 
     y_pred = model.predict(x_test_branches)
     y_pred_binary = (y_pred > 0.5).astype(int)
-    print(classification_report(y_test, y_pred_binary))
-
-    for i, label in enumerate(label_encodings):
-        print(f"{i}: {label}")
-    # print(label_encodings)
+    class_report = classification_report(
+        y_test, y_pred_binary, target_names=mlb.classes_
+    )
+    # print(classification_report(y_test, y_pred_binary))
 
     if save_model:
         model.save("./models/new_model.h5")
+
+    return class_report
 
 
 def random_forest_pipeline(n_estimators, save_model=False):
@@ -196,15 +199,53 @@ def random_forest_pipeline(n_estimators, save_model=False):
     y_pred = rf_model.predict(x_test)
 
     print("Random forst classification report:")
-    print(classification_report(y_test, y_pred, target_names=mlb.classes_))
+    class_report = classification_report(y_test, y_pred, target_names=mlb.classes_)
+    # print(classification_report(y_test, y_pred, target_names=mlb.classes_))
 
     if save_model:
         joblib.dump(rf_model, "./models/new_sklearn_model.pkl")
 
+    return class_report
+
 
 def main():
-    # train_random_factoring_tree_model(epochs=500, learning_rate=0.001, save_model=False)
-    random_forest_pipeline(n_estimators=100, save_model=True)
+    rft_report = train_random_factoring_tree_model(
+        epochs=500, learning_rate=0.001, save_model=True
+    )
+    forest_report = random_forest_pipeline(n_estimators=100, save_model=True)
+
+    print("Random Factoring Tree:")
+    print(rft_report)
+    print("Random Forest Algorithm:")
+    print(forest_report)
+
+    # model = models.load_model("./models/new_model.h5")
+    # scaler = joblib.load("./models/standard_scaler.pkl")
+    # mlb = joblib.load("./models/multi_label_binarizer.pkl")
+
+    # test_df = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
+    # target_column = "Label"
+    # drop_columns = [
+    #     "Unnamed: 0.1",
+    #     "Unnamed: 0",
+    # ]
+
+    # x_test = test_df.drop(
+    #     columns=drop_columns + [target_column], errors="ignore"
+    # ).select_dtypes(include=["int64", "float64"])
+    # y_test = test_df[target_column].str.split(",")
+
+    # x_test, y_test, _ = preprocess_data(test_df, target_column, drop_columns)
+
+    # splits = np.array_split(np.arange(x_test.shape[1]), 3)
+    # x_test_scaled = scaler.transform(x_test)
+    # x_test_branches = [x_test[:, split] for split in splits]
+
+    # y_test_binarized = mlb.transform(y_test)
+
+    # y_pred_probs = model.predict(x_test_branches)
+    # y_pred = (y_pred_probs > 0.5).astype(int)
+    # print(classification_report(y_test_binarized, y_pred, target_names=mlb.classes_))
 
 
 if __name__ == "__main__":

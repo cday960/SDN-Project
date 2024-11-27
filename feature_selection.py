@@ -2,13 +2,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import joblib
 from sklearn.preprocessing import LabelEncoder, StandardScaler, MultiLabelBinarizer
 from sklearn.feature_selection import mutual_info_classif, RFE
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 
-def preprocess_data(df, target_column, drop_columns=None):
+def preprocess_data(df, target_column, drop_columns=None, save_file=False):
     """
     Drops unnecessary columns.
     Encodes the target column.
@@ -23,15 +24,8 @@ def preprocess_data(df, target_column, drop_columns=None):
     # print(df.columns)
 
     # Encode target var for classification
-    # le = LabelEncoder()
-    # df[target_column] = le.fit_transform(df[target_column])
-
     mlb = MultiLabelBinarizer()
     y = mlb.fit_transform(df[target_column].str.split(","))
-
-    label_encodings = []
-    for _, label in enumerate(mlb.classes_):
-        label_encodings.append(label)
 
     # Creates a list of all columns that are numerical so we can
     # encode all of the features
@@ -50,7 +44,11 @@ def preprocess_data(df, target_column, drop_columns=None):
     scaler = StandardScaler()
     x_scaled = scaler.fit_transform(x)
 
-    return x_scaled, y, label_encodings
+    if save_file:
+        joblib.dump(mlb, "./models/multi_label_binarizer.pkl")
+        joblib.dump(scaler, "./models/standard_scaler.pkl")
+
+    return x_scaled, y, mlb
 
 
 def preprocess_data_sklearn(
