@@ -30,7 +30,6 @@ def preprocess_data(df, target_column, drop_columns=None, save_file=False):
     # Creates a list of all columns that are numerical so we can
     # encode all of the features
     numerical_features = df.select_dtypes(include=["int64", "float64"]).columns
-    # numerical_features = numerical_features.drop(target_column)
 
     # Separate features and target
     x = df[numerical_features]
