@@ -24,8 +24,10 @@ from feature_selection import (
     get_top_features_rf,
     get_top_features_mi,
     label_feature_correlation_heatmap,
+    please_work,
     preprocess_data,
     preprocess_data_sklearn,
+    preprocess_isolate_columns,
     random_split_features,
 )
 
@@ -119,6 +121,37 @@ def load_tf_model(path):
     return loaded_model
 
 
+def train_cold_warm(epochs, learning_rate):
+    train_df = pd.read_csv("datasets/Custom_DNP3_Parser_Training_Balanced.csv")
+    test_df = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
+
+    drop_columns = [
+        "Unnamed: 0.1",
+        "Unnamed: 0",
+    ]
+    target_column = "Label"
+
+    x_train, y_train = please_work(train_df, target_column, drop_columns)
+    x_test, y_test = please_work(test_df, target_column, drop_columns)
+
+    model = tf.keras.Sequential(
+        [
+            Dense(64, activation="relu", input_dim=x_train.shape[1]),
+            Dense(32, activation="relu"),
+            Dense(2, activation="sigmoid"),
+        ]
+    )
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=["accuracy"])
+    model.fit(
+        x_train, y_train, epochs=epochs, batch_size=32, validation_data=(x_test, y_test)
+    )
+
+    loss, accuracy = model.evaluate(x_test, y_test)
+    print(f"Loss: {loss}, Accuracy: {accuracy}")
+
+
 def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
     train_df = pd.read_csv("datasets/Custom_DNP3_Parser_Training_Balanced.csv")
     test_df = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
@@ -129,14 +162,18 @@ def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
     ]
     target_column = "Label"
 
-    x_train, y_train, mlb = preprocess_data(
-        train_df, target_column, drop_columns, save_file=save_model
-    )
-    x_test, y_test, mlb = preprocess_data(test_df, target_column, drop_columns)
+    # x_train, y_train, mlb = preprocess_data(
+    #     train_df, target_column, drop_columns, save_file=save_model
+    # )
+    # x_test, y_test, mlb = preprocess_data(test_df, target_column, drop_columns)
+
+    x_train, y_train = preprocess_isolate_columns(train_df, target_column, drop_columns)
+    x_test, y_test = preprocess_isolate_columns(test_df, target_column, drop_columns)
 
     splits = random_split_features(x_train, num_splits=3)
 
-    num_classes = y_train.shape[1]
+    # num_classes = y_train.shape[1]
+    num_classes = 2
 
     model = random_factoring_tree(x_train, splits, num_classes)
 
@@ -164,10 +201,11 @@ def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
 
     y_pred = model.predict(x_test_branches)
     y_pred_binary = (y_pred > 0.5).astype(int)
-    class_report = classification_report(
-        y_test, y_pred_binary, target_names=mlb.classes_
-    )
-    # print(classification_report(y_test, y_pred_binary))
+    # class_report = classification_report(
+    #     y_test, y_pred_binary, target_names=mlb.classes_
+    # )
+
+    class_report = classification_report(y_test, y_pred_binary)
 
     if save_model:
         model.save("./models/new_model.h5")
@@ -209,15 +247,17 @@ def random_forest_pipeline(n_estimators, save_model=False):
 
 
 def main():
-    rft_report = train_random_factoring_tree_model(
-        epochs=500, learning_rate=0.001, save_model=True
-    )
-    forest_report = random_forest_pipeline(n_estimators=100, save_model=True)
+    # rft_report = train_random_factoring_tree_model(
+    #     epochs=500, learning_rate=0.001, save_model=False
+    # )
+    # forest_report = random_forest_pipeline(n_estimators=100, save_model=True)
 
-    print("Random Factoring Tree:")
-    print(rft_report)
-    print("Random Forest Algorithm:")
-    print(forest_report)
+    # print("Random Factoring Tree:")
+    # print(rft_report)
+    # print("Random Forest Algorithm:")
+    # print(forest_report)
+
+    train_cold_warm(100, 0.001)
 
     # model = models.load_model("./models/new_model.h5")
     # scaler = joblib.load("./models/standard_scaler.pkl")

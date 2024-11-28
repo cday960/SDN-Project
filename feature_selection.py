@@ -9,6 +9,45 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 
+def preprocess_isolate_columns(df, target_column, drop_columns=[]):
+    filtered_df = df[df[target_column].isin(["COLD_RESTART", "WARM_RESTART"])]
+    print(filtered_df)
+
+    label_mapping = {"COLD_RESTART": 0, "WARM_RESTART": 1}
+    filtered_df[target_column] = filtered_df[target_column].map(label_mapping)
+
+    x = filtered_df.drop(
+        columns=drop_columns + [target_column], errors="ignore"
+    ).select_dtypes(include=["int64", "float64"])
+    y = filtered_df[target_column]
+
+    scaler = StandardScaler()
+    x_scaled = scaler.fit_transform(x)
+
+    return x_scaled, y
+
+
+def preprocess_isolate(df, target_column, drop_columns=[]):
+    filtered_df = df[df[target_column].str.contains("COLD_RESTART|WARM_RESTART")]
+
+    filtered_df["COLD_RESTART"] = (
+        filtered_df[target_column].str.contains("COLD_RESTART").astype(int)
+    )
+    filtered_df["WARM_RESTART"] = (
+        filtered_df[target_column].str.contains("WARM_RESTART").astype(int)
+    )
+
+    x = filtered_df.drop(
+        columns=drop_columns + [target_column], errors="ignore"
+    ).select_dtypes(include=["int64", "float64"])
+    y = filtered_df[["COLD_RESTART", "WARM_RESTART"]]
+
+    scaler = StandardScaler()
+    x_scaled = scaler.fit_transform(x)
+
+    return x_scaled, y
+
+
 def preprocess_data(df, target_column, drop_columns=None, save_file=False):
     """
     Drops unnecessary columns.
