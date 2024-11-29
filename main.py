@@ -24,7 +24,7 @@ from feature_selection import (
     get_top_features_rf,
     get_top_features_mi,
     label_feature_correlation_heatmap,
-    please_work,
+    preprocess_isolate,
     preprocess_data,
     preprocess_data_sklearn,
     preprocess_isolate_columns,
@@ -131,8 +131,8 @@ def train_cold_warm(epochs, learning_rate):
     ]
     target_column = "Label"
 
-    x_train, y_train = please_work(train_df, target_column, drop_columns)
-    x_test, y_test = please_work(test_df, target_column, drop_columns)
+    x_train, y_train = preprocess_isolate(train_df, target_column, drop_columns)
+    x_test, y_test = preprocess_isolate(test_df, target_column, drop_columns)
 
     model = tf.keras.Sequential(
         [
@@ -257,7 +257,7 @@ def main():
     # print("Random Forest Algorithm:")
     # print(forest_report)
 
-    train_cold_warm(100, 0.001)
+    train_cold_warm(100, 0.00001)
 
     # model = models.load_model("./models/new_model.h5")
     # scaler = joblib.load("./models/standard_scaler.pkl")
