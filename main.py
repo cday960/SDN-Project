@@ -13,21 +13,21 @@ from tensorflow.keras.layers import (
     BatchNormalization,
     Dropout,
 )
-from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer, StandardScaler
-from sklearn.feature_selection import mutual_info_classif, RFE
+from sklearn.preprocessing import LabelEncoder
+
+# from sklearn.feature_selection import mutual_info_classif, RFE
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 from sklearn.multiclass import OneVsRestClassifier
 from feature_selection import (
-    get_top_features_rfe,
     get_top_features_corr,
     get_top_features_rf,
     get_top_features_mi,
     label_feature_correlation_heatmap,
+    new_figures,
     preprocess_isolate,
     preprocess_data,
     preprocess_data_sklearn,
-    preprocess_isolate_columns,
     random_split_features,
 )
 
@@ -167,8 +167,8 @@ def train_random_factoring_tree_model(epochs, learning_rate, save_model=False):
     # )
     # x_test, y_test, mlb = preprocess_data(test_df, target_column, drop_columns)
 
-    x_train, y_train = preprocess_isolate_columns(train_df, target_column, drop_columns)
-    x_test, y_test = preprocess_isolate_columns(test_df, target_column, drop_columns)
+    x_train, y_train = preprocess_isolate(train_df, target_column, drop_columns)
+    x_test, y_test = preprocess_isolate(test_df, target_column, drop_columns)
 
     splits = random_split_features(x_train, num_splits=3)
 
@@ -247,116 +247,76 @@ def random_forest_pipeline(n_estimators, save_model=False):
 
 
 def main():
-    # rft_report = train_random_factoring_tree_model(
-    #     epochs=500, learning_rate=0.001, save_model=False
-    # )
-    # forest_report = random_forest_pipeline(n_estimators=100, save_model=True)
+    # Gives pearson correlation figures for each threat type
+    new_figures(20)
 
-    # print("Random Factoring Tree:")
-    # print(rft_report)
-    # print("Random Forest Algorithm:")
-    # print(forest_report)
+    rft_report = train_random_factoring_tree_model(
+        epochs=10, learning_rate=0.00001, save_model=False
+    )
+    forest_report = random_forest_pipeline(n_estimators=100, save_model=False)
+
+    print("Random Factoring Tree:")
+    print(rft_report)
+    print("Random Forest Algorithm:")
+    print(forest_report)
 
     train_cold_warm(100, 0.00001)
 
-    # model = models.load_model("./models/new_model.h5")
-    # scaler = joblib.load("./models/standard_scaler.pkl")
-    # mlb = joblib.load("./models/multi_label_binarizer.pkl")
+    # train_random_factoring_tree_model(100, 0.001)
 
-    # test_df = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
-    # target_column = "Label"
-    # drop_columns = [
-    #     "Unnamed: 0.1",
-    #     "Unnamed: 0",
-    # ]
+    # Load data
+    # data = pd.read_csv("datasets/CICFlowMeter_Testing_Balanced.csv")
+    data = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
+    # print(data.columns)
 
-    # x_test = test_df.drop(
-    #     columns=drop_columns + [target_column], errors="ignore"
-    # ).select_dtypes(include=["int64", "float64"])
-    # y_test = test_df[target_column].str.split(",")
+    # Features want to drop
+    drop_features = [
+        "Unnamed: 0.1",
+        "Unnamed: 0",
+        "Src Port",
+    ]
+    data = data.drop(columns=drop_features, errors="ignore")
 
-    # x_test, y_test, _ = preprocess_data(test_df, target_column, drop_columns)
+    # # Encode labels to numerical value to make processing easier
+    le = LabelEncoder()
+    data["Encoded_Label"] = le.fit_transform(data["Label"])
 
-    # splits = np.array_split(np.arange(x_test.shape[1]), 3)
-    # x_test_scaled = scaler.transform(x_test)
-    # x_test_branches = [x_test[:, split] for split in splits]
+    label_feature_correlation_heatmap(data)
 
-    # y_test_binarized = mlb.transform(y_test)
+    attack_labels = data["Label"].unique()
+    attack_labels = [x for x in attack_labels if x != "NORMAL"]
 
-    # y_pred_probs = model.predict(x_test_branches)
-    # y_pred = (y_pred_probs > 0.5).astype(int)
-    # print(classification_report(y_test_binarized, y_pred, target_names=mlb.classes_))
+    feature_data = []
+
+    top_features_corr = {
+        label: get_top_features_corr(label, data, top_n=20)[0]
+        for label in attack_labels
+    }
+    feature_data.append(top_features_corr)
+
+    top_features_mi = {
+        label: get_top_features_mi(label, data, top_n=20)[0] for label in attack_labels
+    }
+    feature_data.append(top_features_mi)
+
+    top_features_rf = {
+        label: get_top_features_rf(label, data, top_n=20)[0] for label in attack_labels
+    }
+    feature_data.append(top_features_rf)
+
+    # Creates a csv for the top features correlation
+    result = []
+
+    for label in attack_labels:
+        top_features, _ = get_top_features_corr(label, data, top_n=20)
+
+        for feature, corr in top_features.items():
+            result.append({"Label": label, "Feature": feature, "Correlation": corr})
+
+    results_df = pd.DataFrame(result)
+    results_df.to_csv("./exported_data/top_correlated_features.csv")
+    print("Exported csv.")
 
 
 if __name__ == "__main__":
     main()
-
-
-# Load data
-# data = pd.read_csv("datasets/CICFlowMeter_Testing_Balanced.csv")
-# data = pd.read_csv("datasets/Custom_DNP3_Parser_Testing_Balanced.csv")
-# print(data.columns)
-
-# # Features want to drop
-# drop_features = [
-#     "Unnamed: 0.1",
-#     "Unnamed: 0",
-#     "Src Port",
-# ]
-# data = data.drop(columns=drop_features, errors="ignore")
-
-# # Encode labels to numerical value to make processing easier
-# le = LabelEncoder()
-# data["Encoded_Label"] = le.fit_transform(data["Label"])
-
-# numerical_data = data.select_dtypes(include=[np.number])
-
-# attack_labels = data["Label"].unique()
-# attack_labels = [x for x in attack_labels if x != "NORMAL"]
-
-
-# top_features_corr = {
-#     label: get_top_features_corr(label, data, top_n=20)[0] for label in attack_labels
-# }
-
-# my_print(top_features_corr)
-
-# top_features_mi = {
-#     label: get_top_features_mi(label, data, top_n=20)[0] for label in attack_labels
-# }
-# my_print(top_features_mi)
-
-# top_features_rf = {
-#     label: get_top_features_rf(label, data, top_n=20)[0] for label in attack_labels
-# }
-# my_print(top_features_rf)
-
-
-# rfe_results_by_attack = {
-#     label: get_top_features_rfe(label, data, n_features_to_select=10)
-#     for label in attack_labels
-# }
-# print(rfe_results_by_attack)
-
-# Creates and saves a correlation heatmap between labels and features
-# label_feature_correlation_heatmap(data)
-
-# Creates a csv for the top features correlation
-# result = []
-
-# for label in attack_labels:
-#     top_features, _ = get_top_features_corr(label, data, top_n=20)
-
-#     for feature, corr in top_features.items():
-#         result.append({"Label": label, "Feature": feature, "Correlation": corr})
-
-# results_df = pd.DataFrame(result)
-# results_df.to_csv("./exported_data/top_correlated_features.csv")
-
-
-# Creates a histogram
-# histo = histogram(top_features_corr)
-
-# print("\n\nFrequency of features:")
-# for key, value in histo.items():
-#     print(f"\t{key}: {value}")

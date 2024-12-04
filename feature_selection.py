@@ -9,24 +9,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 
-def preprocess_isolate_columns(df, target_column, drop_columns=[]):
-    filtered_df = df[df[target_column].isin(["COLD_RESTART", "WARM_RESTART"])]
-    print(filtered_df)
-
-    label_mapping = {"COLD_RESTART": 0, "WARM_RESTART": 1}
-    filtered_df[target_column] = filtered_df[target_column].map(label_mapping)
-
-    x = filtered_df.drop(
-        columns=drop_columns + [target_column], errors="ignore"
-    ).select_dtypes(include=["int64", "float64"])
-    y = filtered_df[target_column]
-
-    scaler = StandardScaler()
-    x_scaled = scaler.fit_transform(x)
-
-    return x_scaled, y
-
-
 def preprocess_isolate(df, target_column, drop_columns=[]):
     filtered_df = df[df[target_column].str.contains("COLD_RESTART|WARM_RESTART")]
 
@@ -140,40 +122,38 @@ def get_top_features_corr(attack_label, data, top_n=10):
     # Calculate Pearson correlation
     correlation_matrix = combined.corr()
 
-    plt.figure(figsize=(30, 26))
-    sns.heatmap(
-        correlation_matrix,
-        annot=False,
-        cmap="coolwarm",
-        cbar=True,
-        linewidths=0.3,
-        linecolor="gray",
-        xticklabels=True,
-        yticklabels=True,
-    )
-    plt.title("Feature to Feature interaction")
-    plt.xticks(rotation=45, ha="right", fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.tight_layout()
-    # plt.show()
-    plt.savefig("./figures/feature-to-feature.png", format="png", dpi=300)
-
     # Get correlations with the target and sort by abs value
     target_correlation = (
         correlation_matrix["Target"].abs().sort_values(ascending=False).drop("Target")
     )
+
+    # Drop "Target" itself and return top N features
+    top_features = target_correlation.head(top_n)
+    bottom_features = target_correlation.tail(top_n)
+
+    return [top_features.to_dict(), bottom_features.to_dict()]
 
     # CSV stuff
     # csv_data = target_correlation.head(top_n).reset_index()
     # csv_data.columns = ["Feature", "Correlation"]
     # csv_data.to_csv("./data/top_correlated_features.csv", index=False)
 
-    # Drop "Target" itself and return top N features
-    top_features = target_correlation.head(top_n)
-    bottom_features = target_correlation.tail(top_n)
-
-    # return target_correlation.drop("Target").head(top_n)
-    return [top_features.to_dict(), bottom_features.to_dict()]
+    # plt.figure(figsize=(30, 26))
+    # sns.heatmap(
+    #     correlation_matrix,
+    #     annot=False,
+    #     cmap="coolwarm",
+    #     cbar=True,
+    #     linewidths=0.3,
+    #     linecolor="gray",
+    #     xticklabels=True,
+    #     yticklabels=True,
+    # )
+    # plt.title("Feature to Feature interaction")
+    # plt.xticks(rotation=45, ha="right", fontsize=12)
+    # plt.yticks(fontsize=12)
+    # plt.tight_layout()
+    # plt.savefig("./figures/feature-to-feature.png", format="png", dpi=300)
 
 
 def get_top_features_mi(attack_label, data, top_n=10):
@@ -224,28 +204,6 @@ def get_top_features_rf(attack_label, data, top_n=10):
     return [top, bot]
 
 
-def get_top_features_rfe(attack_label, data, n_features_to_select=10):
-    # Select attack and normal flows
-    attack_data = data[data["Label"] == attack_label].select_dtypes(include=[np.number])
-    normal_data = data[data["Label"] == "NORMAL"].select_dtypes(include=[np.number])
-
-    # Combine normal and attack flows
-    combined = pd.concat([normal_data, attack_data])
-    target = [0] * len(normal_data) + [1] * len(attack_data)
-
-    rf = RandomForestClassifier(n_estimators=100, random_state=42)
-
-    # Initialize rfe with num of feat to select
-    rfe = RFE(estimator=rf, n_features_to_select=n_features_to_select, step=1)
-
-    rfe.fit(combined, target)
-
-    selected_features = combined.columns[rfe.support_]
-    feature_ranking = pd.Series(rfe.ranking_, index=combined.columns).sort_values()
-
-    return selected_features, feature_ranking.head(10)
-
-
 def label_feature_correlation_heatmap(data):
     binary_labels = pd.get_dummies(data["Label"])
 
@@ -274,3 +232,65 @@ def label_feature_correlation_heatmap(data):
     plt.subplots_adjust(right=0.15)
     plt.tight_layout()
     plt.savefig("./figures/feature-to-label.png", format="png", dpi=300)
+
+
+def new_figures(limit=0):
+    data = pd.read_csv("./datasets/CICFlowMeter_Testing_Balanced.csv")
+    # Filter out 'NORMAL' and get unique threat types
+    threat_types = data["Label"].unique()
+    threat_types = [threat for threat in threat_types if threat != "NORMAL"]
+
+    # Separate features from labels
+    features = data.drop(
+        columns=[
+            "Unnamed: 0.1",
+            "Unnamed: 0",
+            "Flow ID",
+            "Src IP",
+            "Dst IP",
+            "Timestamp",
+            "Label",
+        ]
+    )
+    labels = pd.get_dummies(data["Label"])
+
+    # Correlation computation for each label
+    # correlations = features.corrwith(labels, method="pearson")
+    corr_matrix = pd.concat([features, labels], axis=1).corr()
+
+    feature_label_corr = corr_matrix.loc[features.columns, labels.columns]
+
+    # Plotting heatmaps for each threat type
+    for threat in threat_types:
+        # threat_corr = correlations[threat].sort_values(ascending=False)
+        threat_corr = feature_label_corr[threat].sort_values(ascending=False)
+
+        plt.figure(figsize=(10, 6))
+
+        # limited to top 10 highest correlation features
+        if limit != 0:  # triggered by limit bool to allow big or small figures
+            top_10_features = threat_corr.head(limit)
+            sns.heatmap(
+                top_10_features.to_frame(),
+                annot=True,
+                cmap="coolwarm",
+                cbar=True,
+                center=0,
+            )
+        else:
+            # Using a threshold for high correlation
+            high_corr_features = threat_corr[threat_corr.abs() > 0.3]
+            sns.heatmap(
+                high_corr_features.to_frame(),
+                annot=True,
+                cmap="coolwarm",
+                cbar=True,
+                center=0,
+            )
+
+        plt.title(f"High Correlation Features for {threat}")
+        plt.xlabel("Correlation")
+        plt.ylabel("Features")
+        plt.tight_layout()
+        plt.savefig(f"./figures/{threat}_correlation.png")
+        # plt.show()
